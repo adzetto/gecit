@@ -21,7 +21,7 @@ jobs:
           sudo apt-get install -y clang llvm llvm-dev
 
       - name: Compile BPF (x86 + arm64)
-        run: make -f pkg/ebpf/bpf/bpf.mk bpf-all
+        run: make -f pkg/ebpf/bpf/Makefile bpf-all
 
       - name: Upload BPF objects
         uses: actions/upload-artifact@v4
