@@ -1,0 +1,3 @@
+# exclude vendored headers from language statistics
+include/** linguist-vendored
+vmlinux/** linguist-vendored
