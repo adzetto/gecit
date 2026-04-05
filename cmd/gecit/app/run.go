@@ -20,19 +20,21 @@ var runCmd = &cobra.Command{
 }
 
 func init() {
-	runCmd.Flags().Int("restore-after-bytes", 600, "restore normal MSS after N bytes (Linux only)")
-	runCmd.Flags().Int("restore-mss", 0, "restored MSS value (0 = auto/1460)")
-	runCmd.Flags().String("cgroup", "/sys/fs/cgroup", "cgroup v2 path (Linux only)")
 	runCmd.Flags().Int("fake-ttl", 8, "TTL for fake packets (reaches DPI, not server)")
 	runCmd.Flags().Bool("doh", true, "enable built-in DoH DNS resolver")
 	runCmd.Flags().String("doh-upstream", "https://1.1.1.1/dns-query", "DoH upstream URL")
+	runCmd.Flags().Int("mss", 40, "TCP MSS for ClientHello fragmentation (Linux only)")
+	runCmd.Flags().Int("restore-after-bytes", 600, "restore normal MSS after N bytes (Linux only)")
+	runCmd.Flags().Int("restore-mss", 0, "restored MSS value, 0 = auto/1460 (Linux only)")
+	runCmd.Flags().String("cgroup", "/sys/fs/cgroup", "cgroup v2 path (Linux only)")
 
-	viper.BindPFlag("restore_after_bytes", runCmd.Flags().Lookup("restore-after-bytes"))
-	viper.BindPFlag("restore_mss", runCmd.Flags().Lookup("restore-mss"))
-	viper.BindPFlag("cgroup_path", runCmd.Flags().Lookup("cgroup"))
 	viper.BindPFlag("fake_ttl", runCmd.Flags().Lookup("fake-ttl"))
 	viper.BindPFlag("doh_enabled", runCmd.Flags().Lookup("doh"))
 	viper.BindPFlag("doh_upstream", runCmd.Flags().Lookup("doh-upstream"))
+	viper.BindPFlag("mss", runCmd.Flags().Lookup("mss"))
+	viper.BindPFlag("restore_after_bytes", runCmd.Flags().Lookup("restore-after-bytes"))
+	viper.BindPFlag("restore_mss", runCmd.Flags().Lookup("restore-mss"))
+	viper.BindPFlag("cgroup_path", runCmd.Flags().Lookup("cgroup"))
 
 	rootCmd.AddCommand(runCmd)
 }

@@ -172,6 +172,15 @@ eBPF hooks into the kernel's TCP stack synchronously — the fake packet is sent
 └──────────┘        └──────────┘        └──────────┘
 ```
 
+## Roadmap
+
+- [x] Linux — eBPF sock_ops
+- [x] macOS — HTTP CONNECT proxy
+- [x] DoH DNS resolver
+- [ ] Windows — WinDivert packet splitting
+- [ ] Auto-TTL detection (traceroute to find DPI hop count)
+- [ ] ECH (Encrypted Client Hello) support
+
 ## License
 
 GPL-3.0. See [LICENSE](LICENSE).

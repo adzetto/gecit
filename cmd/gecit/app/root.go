@@ -16,11 +16,9 @@ macOS: HTTP CONNECT proxy (system-wide)`,
 }
 
 func init() {
-	rootCmd.PersistentFlags().Int("mss", 40, "MSS for TCP fragmentation")
 	rootCmd.PersistentFlags().IntSlice("ports", []int{443}, "target destination ports")
-	rootCmd.PersistentFlags().String("interface", "", "network interface (auto-detect if empty)")
+	rootCmd.PersistentFlags().String("interface", "", "network interface, macOS only (auto-detect if empty)")
 
-	viper.BindPFlag("mss", rootCmd.PersistentFlags().Lookup("mss"))
 	viper.BindPFlag("ports", rootCmd.PersistentFlags().Lookup("ports"))
 	viper.BindPFlag("interface", rootCmd.PersistentFlags().Lookup("interface"))
 }
