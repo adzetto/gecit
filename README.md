@@ -44,8 +44,7 @@ See [docs/HOW_IT_WORKS.md](docs/HOW_IT_WORKS.md) for the full technical explanat
 git clone https://github.com/boratanrikulu/gecit.git
 cd gecit
 
-# Linux (BPF compilation + binary)
-make bpf-all              # compile BPF objects (x86 + arm64)
+# Linux
 make gecit-linux-amd64    # or gecit-linux-arm64
 
 # macOS
