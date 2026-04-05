@@ -53,6 +53,11 @@ sudo ./gecit run
 curl -L https://github.com/boratanrikulu/gecit/releases/latest/download/gecit-darwin-arm64 -o gecit
 chmod +x gecit
 sudo ./gecit run
+
+# macOS (Intel)
+curl -L https://github.com/boratanrikulu/gecit/releases/latest/download/gecit-darwin-amd64 -o gecit
+chmod +x gecit
+sudo ./gecit run
 ```
 
 ### Building from source
@@ -66,6 +71,7 @@ cd gecit
 make gecit-linux-amd64    # Linux x86_64
 make gecit-linux-arm64    # Linux ARM64
 make gecit-darwin-arm64   # macOS Apple Silicon
+make gecit-darwin-amd64   # macOS Intel
 
 sudo ./bin/gecit-linux-arm64 run
 ```
