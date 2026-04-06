@@ -58,13 +58,15 @@ jobs:
             tags: with_gvisor
           - os: windows
             arch: amd64
-            runner: windows-latest
+            runner: ubuntu-latest
             cgo: 1
+            zig_target: x86_64-windows-gnu
             tags: with_gvisor
           - os: windows
             arch: arm64
-            runner: windows-latest
+            runner: ubuntu-latest
             cgo: 1
+            zig_target: aarch64-windows-gnu
             tags: with_gvisor
 
     steps:
@@ -84,14 +86,17 @@ jobs:
         if: matrix.os == 'darwin'
         run: brew install libpcap || true
 
-      - name: Install Npcap SDK (Windows)
+      - name: Install Zig (cross-compile)
+        if: matrix.zig_target != ''
+        uses: mlugg/setup-zig@v2
+        with:
+          version: 0.14.1
+
+      - name: Install Npcap SDK (Windows cross-compile)
         if: matrix.os == 'windows'
         run: |
-          Invoke-WebRequest -Uri "https://npcap.com/dist/npcap-sdk-1.13.zip" -OutFile npcap-sdk.zip
-          Expand-Archive npcap-sdk.zip -DestinationPath npcap-sdk
-          echo "CGO_CFLAGS=-I${{ github.workspace }}/npcap-sdk/Include" >> $env:GITHUB_ENV
-          echo "CGO_LDFLAGS=-L${{ github.workspace }}/npcap-sdk/Lib/x64" >> $env:GITHUB_ENV
-        shell: pwsh
+          curl -sL https://npcap.com/dist/npcap-sdk-1.13.zip -o npcap-sdk.zip
+          unzip -q npcap-sdk.zip -d npcap-sdk
 
       - name: Build
         env:
@@ -104,6 +109,16 @@ jobs:
           if [ "${{ matrix.os }}" = "windows" ]; then EXT=".exe"; fi
           TAGS=""
           if [ -n "${{ matrix.tags }}" ]; then TAGS="-tags ${{ matrix.tags }}"; fi
+
+          if [ -n "${{ matrix.zig_target }}" ]; then
+            export CC="zig cc -target ${{ matrix.zig_target }}"
+            export CXX="zig c++ -target ${{ matrix.zig_target }}"
+            export CGO_CFLAGS="-I$(pwd)/npcap-sdk/Include"
+            LIB_DIR="x64"
+            if [ "${{ matrix.arch }}" = "arm64" ]; then LIB_DIR="ARM64"; fi
+            export CGO_LDFLAGS="-L$(pwd)/npcap-sdk/Lib/${LIB_DIR} -lwpcap"
+          fi
+
           go build -ldflags="-s -w" $TAGS -o gecit-${{ matrix.os }}-${{ matrix.arch }}${EXT} ./cmd/gecit
 
       - name: Upload binary
