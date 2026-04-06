@@ -61,6 +61,11 @@ jobs:
             runner: windows-latest
             cgo: 1
             tags: with_gvisor
+          - os: windows
+            arch: arm64
+            runner: windows-latest
+            cgo: 1
+            tags: with_gvisor
 
     steps:
       - uses: actions/checkout@v4
@@ -142,4 +147,5 @@ jobs:
             release/gecit-darwin-amd64
             release/gecit-darwin-arm64
             release/gecit-windows-amd64.exe
+            release/gecit-windows-arm64.exe
             release/checksums.txt
