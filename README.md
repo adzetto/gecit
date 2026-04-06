@@ -60,7 +60,12 @@ chmod +x gecit
 sudo ./gecit run
 
 # Windows (amd64) — requires Npcap (npcap.com)
-# Download gecit-windows-amd64.exe from the releases page
+curl -L https://github.com/boratanrikulu/gecit/releases/latest/download/gecit-windows-amd64.exe -o gecit.exe
+gecit.exe run
+
+# Windows (arm64) — requires Npcap (npcap.com)
+curl -L https://github.com/boratanrikulu/gecit/releases/latest/download/gecit-windows-arm64.exe -o gecit.exe
+gecit.exe run
 ```
 
 ### Building from source
