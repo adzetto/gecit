@@ -21,7 +21,7 @@ var runCmd = &cobra.Command{
 func init() {
 	runCmd.Flags().Int("fake-ttl", 8, "TTL for fake packets (reaches DPI, not server)")
 	runCmd.Flags().Bool("doh", true, "enable built-in DoH DNS resolver")
-	runCmd.Flags().String("doh-upstream", "https://1.1.1.1/dns-query", "DoH upstream URL")
+	runCmd.Flags().String("doh-upstream", "cloudflare", "DoH upstream: preset (cloudflare,google,quad9,nextdns,adguard) or URL")
 	runCmd.Flags().Int("mss", 40, "TCP MSS for ClientHello fragmentation (Linux only)")
 	runCmd.Flags().Int("restore-after-bytes", 600, "restore normal MSS after N bytes (Linux only)")
 	runCmd.Flags().Int("restore-mss", 0, "restored MSS value, 0 = auto/1460 (Linux only)")
@@ -77,7 +77,6 @@ func runEngine(cmd *cobra.Command, args []string) error {
 
 	logger.WithField("mode", eng.Mode()).Info("gecit is running — press Ctrl+C to stop")
 
-	// Wait for interrupt signal.
 	sigCh := make(chan os.Signal, 1)
 	signal.Notify(sigCh, syscall.SIGINT, syscall.SIGTERM)
 	<-sigCh

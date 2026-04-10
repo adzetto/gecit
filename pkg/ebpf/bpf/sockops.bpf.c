@@ -34,7 +34,10 @@
 static __always_inline int handle_established(struct bpf_sock_ops *skops,
                                               struct gecit_config_t *cfg)
 {
-	// remote_port is __be32 on LE. ntohl converts to host order.
+	__u32 dst_ip = skops->remote_ip4;
+	if (bpf_map_lookup_elem(&exclude_ips, &dst_ip))
+		return 1;
+
 	__u16 dst_port = (__u16)bpf_ntohl(skops->remote_port);
 	if (!bpf_map_lookup_elem(&target_ports, &dst_port))
 		return 1;

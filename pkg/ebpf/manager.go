@@ -23,12 +23,13 @@ import (
 
 // Config holds the userspace configuration pushed to BPF maps.
 type Config struct {
-	MSS               int      // small MSS for fragmentation (default: 40)
-	RestoreMSS        int      // normal MSS to restore (0 = auto/1460)
-	RestoreAfterBytes int      // restore after N bytes sent (default: 600)
-	Ports             []uint16 // target destination ports (default: [443])
-	CgroupPath        string   // cgroup v2 mount (default: /sys/fs/cgroup)
-	FakeTTL           int      // TTL for fake packets (default: 8)
+	MSS               int
+	RestoreMSS        int
+	RestoreAfterBytes int
+	Ports             []uint16
+	ExcludeIPs        []net.IP
+	CgroupPath        string
+	FakeTTL           int
 }
 
 // connEvent must match struct conn_event in maps.h exactly.
@@ -123,6 +124,10 @@ func (m *Manager) Start(ctx context.Context) error {
 	if err := m.pushTargetPorts(); err != nil {
 		m.Stop()
 		return fmt.Errorf("push target ports: %w", err)
+	}
+	if err := m.pushExcludeIPs(); err != nil {
+		m.Stop()
+		return fmt.Errorf("push exclude IPs: %w", err)
 	}
 
 	eventsMap := coll.Maps["conn_events"]

@@ -48,6 +48,27 @@ func (m *Manager) pushTargetPorts() error {
 	return nil
 }
 
+func (m *Manager) pushExcludeIPs() error {
+	excludeMap := m.collection.Maps["exclude_ips"]
+	if excludeMap == nil {
+		return nil // map not present in older BPF objects
+	}
+
+	val := uint8(1)
+	for _, ip := range m.cfg.ExcludeIPs {
+		ip4 := ip.To4()
+		if ip4 == nil {
+			continue
+		}
+		// Network byte order — same as skops->remote_ip4.
+		key := uint32(ip4[0]) | uint32(ip4[1])<<8 | uint32(ip4[2])<<16 | uint32(ip4[3])<<24
+		if err := excludeMap.Update(key, val, ebpf.UpdateAny); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 // UpdateEnabled updates the enabled state at runtime without reloading BPF.
 func (m *Manager) UpdateEnabled(enabled bool) error {
 	configMap := m.collection.Maps["gecit_config"]

@@ -9,22 +9,19 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-// Server is a local DNS server that forwards queries via DoH.
 type Server struct {
-	doh     *DoHClient
-	server  *dns.Server
-	logger  *logrus.Logger
-	mu      sync.Mutex
-	ipQueue map[string][]string // IP → FIFO queue of domains
+	resolver Resolver
+	upstream string
+	server   *dns.Server
+	logger   *logrus.Logger
+	mu       sync.Mutex
+	ipQueue  map[string][]string
 }
 
 var globalDNS *Server
 
-// GetDNSServer returns the global DNS server instance (for domain lookup).
 func GetDNSServer() *Server { return globalDNS }
 
-// PopDomain returns and removes the next domain for this IP.
-// DNS resolution pushes, connection pops — FIFO order.
 func (s *Server) PopDomain(ip string) string {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -41,17 +38,17 @@ func (s *Server) PopDomain(ip string) string {
 	return domain
 }
 
-func NewServer(dohUpstream string, logger *logrus.Logger) *Server {
+func NewServer(upstream string, logger *logrus.Logger, dial DialFunc) *Server {
 	s := &Server{
-		doh:     NewDoHClient(dohUpstream),
-		logger:  logger,
-		ipQueue: make(map[string][]string),
+		resolver: NewResolver(upstream, dial),
+		upstream: upstream,
+		logger:   logger,
+		ipQueue:  make(map[string][]string),
 	}
 	globalDNS = s
 	return s
 }
 
-// Start begins listening for DNS queries on 127.0.0.1:53.
 func (s *Server) Start() error {
 	mux := dns.NewServeMux()
 	mux.HandleFunc(".", s.handleQuery)
@@ -62,7 +59,6 @@ func (s *Server) Start() error {
 		Handler: mux,
 	}
 
-	// Use NotifyStartedFunc to confirm the server actually bound the port.
 	started := make(chan error, 1)
 	s.server.NotifyStartedFunc = func() {
 		started <- nil
@@ -78,16 +74,17 @@ func (s *Server) Start() error {
 		}
 	}()
 
-	// Wait for actual bind or failure.
 	if err := <-started; err != nil {
 		return fmt.Errorf("DNS server: %w", err)
 	}
 
-	s.logger.WithField("addr", "127.0.0.1:53").Info("DoH DNS server started")
+	s.logger.WithFields(logrus.Fields{
+		"addr":     "127.0.0.1:53",
+		"upstream": s.upstream,
+	}).Info("DNS server started")
 	return nil
 }
 
-// Stop shuts down the DNS server.
 func (s *Server) Stop() error {
 	if s.server != nil {
 		return s.server.Shutdown()
@@ -96,36 +93,31 @@ func (s *Server) Stop() error {
 }
 
 func (s *Server) handleQuery(w dns.ResponseWriter, r *dns.Msg) {
-	// Pack the query to raw wire format.
 	queryBytes, err := r.Pack()
 	if err != nil {
 		s.sendError(w, r, dns.RcodeServerFailure)
 		return
 	}
 
-	// Forward via DoH.
-	respBytes, err := s.doh.Resolve(queryBytes)
+	result, err := s.resolver.Resolve(queryBytes)
 	if err != nil {
-		s.logger.WithError(err).Debug("DoH resolve failed")
+		s.logger.WithError(err).Debug("DNS resolve failed")
 		s.sendError(w, r, dns.RcodeServerFailure)
 		return
 	}
 
-	// Unpack the DoH response.
 	resp := new(dns.Msg)
-	if err := resp.Unpack(respBytes); err != nil {
+	if err := resp.Unpack(result.Data); err != nil {
 		s.sendError(w, r, dns.RcodeServerFailure)
 		return
 	}
 
-	// Match the query ID (DoH might return a different ID).
 	resp.Id = r.Id
 
 	if err := w.WriteMsg(resp); err != nil {
 		s.logger.WithError(err).Debug("failed to write DNS response")
 	}
 
-	// Log A/AAAA queries for visibility.
 	if len(r.Question) > 0 && len(resp.Answer) > 0 {
 		q := r.Question[0]
 		if q.Qtype == dns.TypeA || q.Qtype == dns.TypeAAAA {
@@ -138,8 +130,12 @@ func (s *Server) handleQuery(w dns.ResponseWriter, r *dns.Msg) {
 					ips = append(ips, aaaaRec.AAAA.String())
 				}
 			}
-			// Cache IP→domain for log display (FIFO queue).
 			domain := strings.TrimSuffix(q.Name, ".")
+			s.logger.WithFields(logrus.Fields{
+				"domain": domain,
+				"ips":    strings.Join(ips, ","),
+				"via":    result.Via,
+			}).Debug("DNS resolved")
 			s.mu.Lock()
 			for _, ip := range ips {
 				s.ipQueue[ip] = append(s.ipQueue[ip], domain)

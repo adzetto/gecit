@@ -15,7 +15,7 @@ func TestDefaultConfig(t *testing.T) {
 		{"RestoreAfterBytes", cfg.RestoreAfterBytes, 600},
 		{"FakeTTL", cfg.FakeTTL, 8},
 		{"DoHEnabled", cfg.DoHEnabled, true},
-		{"DoHUpstream", cfg.DoHUpstream, "https://1.1.1.1/dns-query"},
+		{"DoHUpstream", cfg.DoHUpstream, "cloudflare"},
 		{"CgroupPath", cfg.CgroupPath, "/sys/fs/cgroup"},
 	}
 

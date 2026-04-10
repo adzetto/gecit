@@ -19,18 +19,20 @@ type tunEngine struct {
 }
 
 func newPlatformEngine(cfg engine.Config, logger *logrus.Logger) (engine.Engine, error) {
-	dohUpstream := cfg.DoHUpstream
-	if dohUpstream == "" {
-		dohUpstream = "https://1.1.1.1/dns-query"
+	upstream := cfg.DoHUpstream
+	if upstream == "" {
+		upstream = "cloudflare"
 	}
 
+	mgr := gecittun.NewManager(gecittun.Config{
+		Ports:     cfg.Ports,
+		FakeTTL:   cfg.FakeTTL,
+		Interface: cfg.Interface,
+	}, logger)
+
 	return &tunEngine{
-		mgr: gecittun.NewManager(gecittun.Config{
-			Ports:     cfg.Ports,
-			FakeTTL:   cfg.FakeTTL,
-			Interface: cfg.Interface,
-		}, logger),
-		dns:        gecitdns.NewServer(dohUpstream, logger),
+		mgr:        mgr,
+		dns:        gecitdns.NewServer(upstream, logger, mgr.DialContext),
 		dohEnabled: cfg.DoHEnabled,
 		logger:     logger,
 	}, nil
@@ -49,7 +51,7 @@ func (e *tunEngine) Start(ctx context.Context) error {
 			resumeSystemDNS()
 			return err
 		}
-		e.logger.Info("DoH DNS active")
+		e.logger.Info("encrypted DNS active")
 	}
 
 	if err := e.mgr.Start(ctx); err != nil {

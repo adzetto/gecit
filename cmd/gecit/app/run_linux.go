@@ -2,6 +2,9 @@ package app
 
 import (
 	"context"
+	"net"
+	"net/url"
+	"strings"
 
 	gecitdns "github.com/boratanrikulu/gecit/pkg/dns"
 	bpf "github.com/boratanrikulu/gecit/pkg/ebpf"
@@ -17,30 +20,63 @@ type ebpfEngine struct {
 }
 
 func newPlatformEngine(cfg engine.Config, logger *logrus.Logger) (engine.Engine, error) {
-	mgr := bpf.NewManager(bpf.Config{
-		MSS:               cfg.MSS,
-		RestoreMSS:        cfg.RestoreMSS,
-		RestoreAfterBytes: cfg.RestoreAfterBytes,
-		Ports:             cfg.Ports,
-		CgroupPath:        cfg.CgroupPath,
-		FakeTTL:           cfg.FakeTTL,
-	}, logger)
-
-	dohUpstream := cfg.DoHUpstream
-	if dohUpstream == "" {
-		dohUpstream = "https://1.1.1.1/dns-query"
+	upstream := cfg.DoHUpstream
+	if upstream == "" {
+		upstream = "cloudflare"
 	}
 
 	return &ebpfEngine{
-		mgr:        mgr,
-		dns:        gecitdns.NewServer(dohUpstream, logger),
+		mgr: bpf.NewManager(bpf.Config{
+			MSS:               cfg.MSS,
+			RestoreMSS:        cfg.RestoreMSS,
+			RestoreAfterBytes: cfg.RestoreAfterBytes,
+			Ports:             cfg.Ports,
+			ExcludeIPs:        dohUpstreamIPs(upstream),
+			CgroupPath:        cfg.CgroupPath,
+			FakeTTL:           cfg.FakeTTL,
+		}, logger),
+		dns:        gecitdns.NewServer(upstream, logger, nil),
 		dohEnabled: cfg.DoHEnabled,
 		logger:     logger,
 	}, nil
 }
 
+// dohUpstreamIPs extracts IP addresses from DoH upstream config
+// so eBPF can exclude them from fake injection.
+// dohUpstreamIPs resolves all DoH upstream hostnames to IPs before
+// gecit takes over system DNS. These IPs are excluded from eBPF fake
+// injection so DoH traffic isn't disrupted.
+func dohUpstreamIPs(upstream string) []net.IP {
+	var ips []net.IP
+	for _, u := range strings.Split(upstream, ",") {
+		u = strings.TrimSpace(u)
+		if p, ok := gecitdns.Presets[u]; ok {
+			u = p.URL
+		}
+		parsed, err := url.Parse(u)
+		if err != nil {
+			continue
+		}
+		host := parsed.Hostname()
+		if ip := net.ParseIP(host); ip != nil {
+			ips = append(ips, ip)
+			continue
+		}
+		// Hostname — resolve before we take over system DNS.
+		resolved, err := net.LookupIP(host)
+		if err != nil {
+			continue
+		}
+		for _, ip := range resolved {
+			if ip.To4() != nil {
+				ips = append(ips, ip)
+			}
+		}
+	}
+	return ips
+}
+
 func (e *ebpfEngine) Start(ctx context.Context) error {
-	// 1. Start DoH DNS server (if enabled).
 	if e.dohEnabled {
 		if err := e.dns.Start(); err != nil {
 			return err
@@ -49,10 +85,9 @@ func (e *ebpfEngine) Start(ctx context.Context) error {
 			e.dns.Stop()
 			return err
 		}
-		e.logger.Info("system DNS set to 127.0.0.1 (DoH)")
+		e.logger.Info("encrypted DNS active")
 	}
 
-	// 2. Start eBPF (fake injection + MSS fragmentation).
 	if err := e.mgr.Start(ctx); err != nil {
 		if e.dohEnabled {
 			gecitdns.RestoreSystemDNS()

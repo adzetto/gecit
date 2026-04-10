@@ -27,6 +27,14 @@ struct {
 	__type(value, __u8);
 } target_ports SEC(".maps");
 
+// Destination IPs to exclude from fake injection (e.g. DoH upstreams).
+struct {
+	__uint(type, BPF_MAP_TYPE_HASH);
+	__uint(max_entries, 64);
+	__type(key, __u32);   // IPv4 address in network byte order
+	__type(value, __u8);
+} exclude_ips SEC(".maps");
+
 // Perf event array for notifying userspace of new connections.
 struct conn_event {
 	__u32 src_ip;

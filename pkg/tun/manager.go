@@ -157,6 +157,11 @@ func (m *Manager) dialServer(network, addr string, timeout time.Duration) (net.C
 	return (&net.Dialer{Timeout: timeout, Control: m.bindControl}).DialContext(m.ctx, network, addr)
 }
 
+// DialContext dials via physical NIC, bypassing TUN. Exported for DoH client.
+func (m *Manager) DialContext(ctx context.Context, network, addr string) (net.Conn, error) {
+	return (&net.Dialer{Timeout: 5 * time.Second, Control: m.bindControl}).DialContext(ctx, network, addr)
+}
+
 func (m *Manager) startSeqTracker() error {
 	iface := m.cfg.Interface
 	if iface == "" {
@@ -213,13 +218,7 @@ func (m *Manager) tunOptions() tun.Options {
 		AutoRoute:        true,
 		InterfaceMonitor: m.ifaceMonitor,
 		InterfaceFinder:  m.ifaceFinder,
-		// Point TUN DNS to our DoH server so Windows doesn't use TUN peer as DNS.
 		DNSServers: []netip.Addr{netip.MustParseAddr("127.0.0.1")},
-		// Prevent DoH upstream from routing through TUN (DNS loop).
-		Inet4RouteExcludeAddress: []netip.Prefix{
-			netip.MustParsePrefix("1.1.1.1/32"),
-			netip.MustParsePrefix("8.8.8.8/32"),
-		},
 	}
 }
 

@@ -112,7 +112,7 @@ func TestPopDomain_Concurrent(t *testing.T) {
 
 func TestNewServer_SetsGlobal(t *testing.T) {
 	globalDNS = nil
-	s := NewServer("https://1.1.1.1/dns-query", logrus.New())
+	s := NewServer("cloudflare", logrus.New(), nil)
 
 	if GetDNSServer() != s {
 		t.Fatal("GetDNSServer() should return the server set by NewServer()")

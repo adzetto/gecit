@@ -94,14 +94,20 @@ If gecit crashes, run `sudo gecit cleanup` to restore system settings.
 ## Usage
 
 ```bash
-# Default settings (TTL=8, DoH via Cloudflare 1.1.1.1)
+# Default (TTL=8, Cloudflare DoH)
 sudo gecit run
 
-# Custom TTL (adjust based on hop count to DPI)
-sudo gecit run --fake-ttl 12
+# Use Google DoH
+sudo gecit run --doh-upstream google
 
-# Custom DoH upstream
-sudo gecit run --doh https://8.8.8.8/dns-query
+# Multiple upstreams (fallback order)
+sudo gecit run --doh-upstream cloudflare,quad9
+
+# Custom DoH URL
+sudo gecit run --doh-upstream https://8.8.8.8/dns-query
+
+# Custom TTL
+sudo gecit run --fake-ttl 12
 
 # Check system capabilities
 sudo gecit status
@@ -114,12 +120,22 @@ sudo gecit cleanup
 
 | Flag | Default | Description |
 |------|---------|-------------|
+| `--doh-upstream` | `cloudflare` | DoH upstream: preset name or URL. Comma-separated for fallback. |
 | `--fake-ttl` | `8` | TTL for fake packets (must reach DPI but expire before server) |
-| `--doh` | `https://1.1.1.1/dns-query` | DoH upstream URL |
 | `--mss` | `40` | TCP MSS for ClientHello fragmentation (Linux) |
 | `--ports` | `443` | Target destination ports |
 | `--interface` | auto | Network interface |
 | `-v` | off | Verbose/debug logging |
+
+### DoH presets
+
+| Preset | Upstream |
+|--------|----------|
+| `cloudflare` | `https://1.1.1.1/dns-query` |
+| `google` | `https://8.8.8.8/dns-query` |
+| `quad9` | `https://9.9.9.9:5053/dns-query` |
+| `nextdns` | `https://dns.nextdns.io/dns-query` |
+| `adguard` | `https://dns.adguard-dns.com/dns-query` |
 
 ### Finding the right TTL
 

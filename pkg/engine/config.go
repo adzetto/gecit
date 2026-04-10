@@ -1,6 +1,5 @@
 package engine
 
-// Config holds platform-agnostic configuration for the DPI bypass engine.
 type Config struct {
 	MSS               int      `yaml:"mss" mapstructure:"mss"`
 	RestoreMSS        int      `yaml:"restore_mss" mapstructure:"restore_mss"`
@@ -16,12 +15,12 @@ type Config struct {
 func DefaultConfig() Config {
 	return Config{
 		MSS:               40,
-		RestoreMSS:        0, // auto (1460)
+		RestoreMSS:        0,
 		RestoreAfterBytes: 600,
 		Ports:             []uint16{443},
 		CgroupPath:        "/sys/fs/cgroup",
 		FakeTTL:           8,
 		DoHEnabled:        true,
-		DoHUpstream:       "https://1.1.1.1/dns-query",
+		DoHUpstream:       "cloudflare",
 	}
 }
