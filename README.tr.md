@@ -11,6 +11,8 @@ sudo gecit run
 
 > **Sorumluluk Reddi**: Bu proje yalnızca eğitim ve araştırma amaçlıdır. IP adresinizi gizlemez, trafiğinizi şifrelemez, anonimlik sağlamaz. Kullanım tamamen kendi sorumluluğunuzdadır. Kullanıcılar kendi yetki alanlarındaki tüm yasalara uymakla yükümlüdür.
 
+> **Fork notu (2026-04-11)**: Bu fork, TLS fingerprint sızıntısını azaltmak için rastgelelestirilmis sahte ClientHello profilleri ekler, macOS/Windows tarafinda seq/ack beklemesini event-driven hale getirir ve DNS korelasyon kuyrugunun omrunu sinirlar. Ayrica NFQUEUE merkezli ilk OpenWrt/router-mode tasarim iskeleti ve blockcheck benzeri kucuk bir probe plani eklenmistir. Bu degistirilmis surum GPL-3.0 altinda kalir; ayrintilar icin [LICENSE](LICENSE) dosyasina bakin.
+
 ## Nasıl çalışır
 
 ```

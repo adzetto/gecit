@@ -3,13 +3,14 @@ package dns
 import (
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/sirupsen/logrus"
 )
 
 func newTestServer() *Server {
 	return &Server{
-		ipQueue: make(map[string][]string),
+		ipQueue: make(map[string][]queuedDomain),
 		logger:  logrus.New(),
 	}
 }
@@ -23,7 +24,7 @@ func TestPopDomain_Empty(t *testing.T) {
 
 func TestPopDomain_Single(t *testing.T) {
 	s := newTestServer()
-	s.ipQueue["1.2.3.4"] = []string{"example.com"}
+	s.ipQueue["1.2.3.4"] = []queuedDomain{{domain: "example.com", addedAt: time.Now()}}
 
 	got := s.PopDomain("1.2.3.4")
 	if got != "example.com" {
@@ -38,7 +39,12 @@ func TestPopDomain_Single(t *testing.T) {
 
 func TestPopDomain_FIFO(t *testing.T) {
 	s := newTestServer()
-	s.ipQueue["10.0.0.1"] = []string{"first.com", "second.com", "third.com"}
+	now := time.Now()
+	s.ipQueue["10.0.0.1"] = []queuedDomain{
+		{domain: "first.com", addedAt: now},
+		{domain: "second.com", addedAt: now},
+		{domain: "third.com", addedAt: now},
+	}
 
 	order := []string{"first.com", "second.com", "third.com"}
 	for i, want := range order {
@@ -56,8 +62,9 @@ func TestPopDomain_FIFO(t *testing.T) {
 
 func TestPopDomain_IndependentIPs(t *testing.T) {
 	s := newTestServer()
-	s.ipQueue["1.1.1.1"] = []string{"cloudflare.com"}
-	s.ipQueue["8.8.8.8"] = []string{"google.com"}
+	now := time.Now()
+	s.ipQueue["1.1.1.1"] = []queuedDomain{{domain: "cloudflare.com", addedAt: now}}
+	s.ipQueue["8.8.8.8"] = []queuedDomain{{domain: "google.com", addedAt: now}}
 
 	got1 := s.PopDomain("1.1.1.1")
 	got2 := s.PopDomain("8.8.8.8")
@@ -78,7 +85,12 @@ func TestPopDomain_Concurrent(t *testing.T) {
 	for i := range domains {
 		domains[i] = "domain.com"
 	}
-	s.ipQueue["10.0.0.1"] = domains
+	now := time.Now()
+	queued := make([]queuedDomain, len(domains))
+	for i, domain := range domains {
+		queued[i] = queuedDomain{domain: domain, addedAt: now}
+	}
+	s.ipQueue["10.0.0.1"] = queued
 
 	// Pop from multiple goroutines — must not panic or corrupt.
 	var wg sync.WaitGroup
@@ -116,5 +128,32 @@ func TestNewServer_SetsGlobal(t *testing.T) {
 
 	if GetDNSServer() != s {
 		t.Fatal("GetDNSServer() should return the server set by NewServer()")
+	}
+}
+
+func TestPopDomain_DropsExpiredEntries(t *testing.T) {
+	s := newTestServer()
+	s.ipQueue["1.2.3.4"] = []queuedDomain{
+		{domain: "stale.com", addedAt: time.Now().Add(-ipQueueEntryTTL - time.Second)},
+		{domain: "fresh.com", addedAt: time.Now()},
+	}
+
+	got := s.PopDomain("1.2.3.4")
+	if got != "fresh.com" {
+		t.Fatalf("got %q, want %q", got, "fresh.com")
+	}
+
+	if got := s.PopDomain("1.2.3.4"); got != "" {
+		t.Fatalf("expected queue to be empty after pruning, got %q", got)
+	}
+}
+
+func TestPruneQueuedDomains_EmptyAfterExpiry(t *testing.T) {
+	q := []queuedDomain{
+		{domain: "expired.com", addedAt: time.Now().Add(-ipQueueEntryTTL - time.Second)},
+	}
+
+	if got := pruneQueuedDomains(q, time.Now()); got != nil {
+		t.Fatalf("expected nil after pruning expired entries, got %#v", got)
 	}
 }

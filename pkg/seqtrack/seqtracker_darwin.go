@@ -2,7 +2,6 @@ package seqtrack
 
 import (
 	"net"
-	"sync"
 	"time"
 
 	"github.com/boratanrikulu/gecit/pkg/capture"
@@ -13,7 +12,7 @@ import (
 // connections and extract real TCP seq/ack numbers.
 type SeqTracker struct {
 	detector capture.Detector
-	conns    sync.Map // map[uint16]capture.ConnectionEvent keyed by local port
+	state    *seqState
 }
 
 func NewSeqTracker(iface string, ports []uint16) (*SeqTracker, error) {
@@ -22,24 +21,16 @@ func NewSeqTracker(iface string, ports []uint16) (*SeqTracker, error) {
 		return nil, err
 	}
 
-	st := &SeqTracker{detector: det}
+	st := &SeqTracker{detector: det, state: newSeqState()}
 	det.Start(func(evt capture.ConnectionEvent) {
-		st.conns.Store(evt.SrcPort, evt)
+		st.state.store(evt)
 	})
 
 	return st, nil
 }
 
 func (st *SeqTracker) WaitForSeqAck(localPort uint16, timeout time.Duration) *capture.ConnectionEvent {
-	deadline := time.Now().Add(timeout)
-	for time.Now().Before(deadline) {
-		if val, ok := st.conns.LoadAndDelete(localPort); ok {
-			evt := val.(capture.ConnectionEvent)
-			return &evt
-		}
-		time.Sleep(1 * time.Millisecond)
-	}
-	return nil
+	return st.state.wait(localPort, timeout)
 }
 
 func (st *SeqTracker) Stop() {

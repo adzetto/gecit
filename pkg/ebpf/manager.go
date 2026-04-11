@@ -203,7 +203,7 @@ func (m *Manager) injectFake(evt connEvent) {
 		Ack:     evt.Ack,
 	}
 
-	if err := m.rawSock.SendFake(conn, fake.TLSClientHello, m.cfg.FakeTTL); err != nil {
+	if err := m.rawSock.SendFake(conn, fake.RandomTLSClientHello(), m.cfg.FakeTTL); err != nil {
 		m.logger.WithError(err).Warn("failed to send fake packet")
 		return
 	}
@@ -221,7 +221,7 @@ func (m *Manager) injectFake(evt connEvent) {
 		"seq": evt.Seq,
 		"ack": evt.Ack,
 		"ttl": m.cfg.FakeTTL,
-	}).Info("fake ClientHello injected")
+	}).Debug("fake ClientHello injected")
 }
 
 // Stop detaches the BPF program and releases all resources.

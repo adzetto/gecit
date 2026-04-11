@@ -13,6 +13,8 @@ sudo gecit run
 
 > **Disclaimer**: This project is for educational and research purposes only. gecit demonstrates eBPF and network programming capabilities in the context of TLS protocol analysis. It does NOT hide your IP address, encrypt your traffic, or provide anonymity. Use is entirely at your own risk. Users are responsible for complying with all applicable laws in their jurisdiction.
 
+> **Fork note (2026-04-11)**: This fork adds randomized fake ClientHello profiles to reduce TLS fingerprint leakage, replaces seq/ack busy-waiting with event-driven synchronization on macOS/Windows, and bounds the DNS correlation queue to reduce stale state. It also includes an initial OpenWrt/router-mode design scaffold centered on NFQUEUE plus a small blockcheck-style probe plan. This modified version remains under GPL-3.0; see [LICENSE](LICENSE).
+
 ## How it works
 
 ```

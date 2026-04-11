@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/miekg/dns"
 	"github.com/sirupsen/logrus"
@@ -15,21 +16,33 @@ type Server struct {
 	server   *dns.Server
 	logger   *logrus.Logger
 	mu       sync.Mutex
-	ipQueue  map[string][]string
+	ipQueue  map[string][]queuedDomain
 }
 
 var globalDNS *Server
 
 func GetDNSServer() *Server { return globalDNS }
 
+const (
+	ipQueueEntryTTL = 30 * time.Second
+	ipQueueMaxPerIP = 16
+)
+
+type queuedDomain struct {
+	domain  string
+	addedAt time.Time
+}
+
 func (s *Server) PopDomain(ip string) string {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	q := s.ipQueue[ip]
+
+	q := pruneQueuedDomains(s.ipQueue[ip], time.Now())
 	if len(q) == 0 {
+		delete(s.ipQueue, ip)
 		return ""
 	}
-	domain := q[0]
+	domain := q[0].domain
 	if len(q) == 1 {
 		delete(s.ipQueue, ip)
 	} else {
@@ -43,7 +56,7 @@ func NewServer(upstream string, logger *logrus.Logger, dial DialFunc) *Server {
 		resolver: NewResolver(upstream, dial),
 		upstream: upstream,
 		logger:   logger,
-		ipQueue:  make(map[string][]string),
+		ipQueue:  make(map[string][]queuedDomain),
 	}
 	globalDNS = s
 	return s
@@ -137,12 +150,35 @@ func (s *Server) handleQuery(w dns.ResponseWriter, r *dns.Msg) {
 				"via":    result.Via,
 			}).Debug("DNS resolved")
 			s.mu.Lock()
+			now := time.Now()
 			for _, ip := range ips {
-				s.ipQueue[ip] = append(s.ipQueue[ip], domain)
+				q := pruneQueuedDomains(s.ipQueue[ip], now)
+				q = append(q, queuedDomain{domain: domain, addedAt: now})
+				if len(q) > ipQueueMaxPerIP {
+					q = q[len(q)-ipQueueMaxPerIP:]
+				}
+				s.ipQueue[ip] = q
 			}
 			s.mu.Unlock()
 		}
 	}
+}
+
+func pruneQueuedDomains(q []queuedDomain, now time.Time) []queuedDomain {
+	if len(q) == 0 {
+		return nil
+	}
+
+	out := q[:0]
+	for _, entry := range q {
+		if now.Sub(entry.addedAt) <= ipQueueEntryTTL {
+			out = append(out, entry)
+		}
+	}
+	if len(out) == 0 {
+		return nil
+	}
+	return out
 }
 
 func (s *Server) sendError(w dns.ResponseWriter, r *dns.Msg, rcode int) {
