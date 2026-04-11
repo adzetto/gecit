@@ -15,12 +15,15 @@ type Engine struct {
 
 // New returns a placeholder engine so future CLI wiring can share one constructor.
 func New(cfg Config) *Engine {
-	return &Engine{cfg: cfg}
+	return &Engine{cfg: cfg.Normalized()}
 }
 
 // Start reserves the lifecycle shape that will later satisfy the engine.Engine contract.
 func (e *Engine) Start(ctx context.Context) error {
 	_ = ctx
+	if err := e.cfg.Validate(); err != nil {
+		return err
+	}
 	return ErrNotImplemented
 }
 
@@ -37,4 +40,14 @@ func (e *Engine) Mode() string {
 // Config exposes the stored scaffold configuration for tests and future wiring.
 func (e *Engine) Config() Config {
 	return e.cfg
+}
+
+// Validate checks whether the current router-mode config is renderable.
+func (e *Engine) Validate() error {
+	return e.cfg.Validate()
+}
+
+// RuleSet returns the current nftables dry-run output for this engine.
+func (e *Engine) RuleSet() (RuleSet, error) {
+	return BuildRuleSet(e.cfg)
 }

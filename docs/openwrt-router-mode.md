@@ -45,8 +45,10 @@ This document tracks a router-wide mode for OpenWrt and similar Linux gateways. 
 ## Code scaffold in this fork
 
 - `pkg/router/config.go` defines the future config surface.
-- `pkg/router/engine.go` defines a placeholder engine with the intended mode name.
-- `pkg/router/probe/probe.go` defines a small plan or result model for a blockcheck-like tool.
+- `pkg/router/engine.go` validates config and exposes dry-run ruleset rendering.
+- `pkg/router/nftables.go` renders nftables setup and teardown commands for an NFQUEUE path.
+- `pkg/router/probe/probe.go` and `pkg/router/probe/dryrun.go` define a small blockcheck-style dry-run workflow.
+- `cmd/gecit/app/router_linux.go` wires experimental Linux commands for `router plan` and `router probe`.
 
 ## Detailed TODOs
 
