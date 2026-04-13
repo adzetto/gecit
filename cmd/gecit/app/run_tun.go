@@ -1,4 +1,4 @@
-//go:build (darwin || windows) && with_gvisor
+//go:build darwin || windows
 
 package app
 
@@ -29,6 +29,7 @@ func newPlatformEngine(cfg engine.Config, logger *logrus.Logger) (engine.Engine,
 		Ports:     cfg.Ports,
 		FakeTTL:   cfg.FakeTTL,
 		Interface: cfg.Interface,
+		Stack:     cfg.TunStack,
 	}, logger)
 
 	return &tunEngine{
@@ -87,4 +88,4 @@ func (e *tunEngine) Stop() error {
 	return nil
 }
 
-func (e *tunEngine) Mode() string { return "tun" }
+func (e *tunEngine) Mode() string { return "tun-" + e.mgr.StackName() }
