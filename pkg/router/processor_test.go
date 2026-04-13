@@ -62,6 +62,29 @@ func TestProcessorInjectsOncePerFlow(t *testing.T) {
 	}
 }
 
+func TestProcessorInjectsIPv6Flow(t *testing.T) {
+	cfg := DefaultConfig()
+	cfg.WANInterface = "wan"
+
+	processor, err := NewProcessor(cfg)
+	if err != nil {
+		t.Fatalf("NewProcessor() error = %v", err)
+	}
+
+	packet := buildIPv6TCPPacket(t, fake.TLSClientHello())
+
+	action, err := processor.ProcessPacket(packet, 0)
+	if err != nil {
+		t.Fatalf("ProcessPacket(ipv6) error = %v", err)
+	}
+	if !action.Inject {
+		t.Fatalf("expected IPv6 packet to inject, reason=%q", action.Reason)
+	}
+	if action.Conn.SrcIP.To4() != nil || action.Conn.DstIP.To4() != nil {
+		t.Fatalf("expected IPv6 addresses, got %+v", action.Conn)
+	}
+}
+
 func TestProcessorSkipsMarkedAndNonClientHelloTraffic(t *testing.T) {
 	cfg := DefaultConfig()
 	cfg.WANInterface = "wan"
@@ -127,6 +150,39 @@ func buildIPv4TCPPacket(t *testing.T, payload []byte) []byte {
 		FixLengths:       true,
 		ComputeChecksums: true,
 	}, ip4, tcp, gopacket.Payload(payload)); err != nil {
+		t.Fatalf("SerializeLayers() error = %v", err)
+	}
+	return buf.Bytes()
+}
+
+func buildIPv6TCPPacket(t *testing.T, payload []byte) []byte {
+	t.Helper()
+
+	ip6 := &layers.IPv6{
+		Version:    6,
+		HopLimit:   64,
+		SrcIP:      net.ParseIP("2001:db8::10"),
+		DstIP:      net.ParseIP("2001:db8::20"),
+		NextHeader: layers.IPProtocolTCP,
+	}
+	tcp := &layers.TCP{
+		SrcPort: 45678,
+		DstPort: 443,
+		Seq:     1000,
+		Ack:     2000,
+		PSH:     true,
+		ACK:     true,
+		Window:  64240,
+	}
+	if err := tcp.SetNetworkLayerForChecksum(ip6); err != nil {
+		t.Fatalf("SetNetworkLayerForChecksum() error = %v", err)
+	}
+
+	buf := gopacket.NewSerializeBuffer()
+	if err := gopacket.SerializeLayers(buf, gopacket.SerializeOptions{
+		FixLengths:       true,
+		ComputeChecksums: true,
+	}, ip6, tcp, gopacket.Payload(payload)); err != nil {
 		t.Fatalf("SerializeLayers() error = %v", err)
 	}
 	return buf.Bytes()

@@ -56,8 +56,8 @@ func (p *Processor) ProcessPacket(packet []byte, mark uint32) (Action, error) {
 	if meta.Protocol != ProtocolTCP {
 		return Action{Reason: "non-tcp packet"}, nil
 	}
-	if meta.IPVersion != 4 {
-		return Action{Reason: "ipv6 fake injection not implemented"}, nil
+	if meta.IPVersion != 4 && meta.IPVersion != 6 {
+		return Action{Reason: "unsupported IP family"}, nil
 	}
 	if !portAllowed(meta.DstPort, p.cfg.TCPPorts) {
 		return Action{Reason: "tcp port not targeted"}, nil
@@ -75,7 +75,7 @@ func (p *Processor) ProcessPacket(packet []byte, mark uint32) (Action, error) {
 
 	conn, ok := packetToConnInfo(meta)
 	if !ok {
-		return Action{Reason: "failed to convert IPs to IPv4"}, nil
+		return Action{Reason: "failed to normalize IP addresses"}, nil
 	}
 
 	return Action{
@@ -87,19 +87,38 @@ func (p *Processor) ProcessPacket(packet []byte, mark uint32) (Action, error) {
 }
 
 func packetToConnInfo(meta PacketMeta) (rawsock.ConnInfo, bool) {
-	srcIP4 := meta.SrcIP.To4()
-	dstIP4 := meta.DstIP.To4()
-	if srcIP4 == nil || dstIP4 == nil {
+	switch meta.IPVersion {
+	case 4:
+		srcIP4 := meta.SrcIP.To4()
+		dstIP4 := meta.DstIP.To4()
+		if srcIP4 == nil || dstIP4 == nil {
+			return rawsock.ConnInfo{}, false
+		}
+		return rawsock.ConnInfo{
+			SrcIP:   append([]byte{}, srcIP4...),
+			DstIP:   append([]byte{}, dstIP4...),
+			SrcPort: meta.SrcPort,
+			DstPort: meta.DstPort,
+			Seq:     meta.TCP.Seq,
+			Ack:     meta.TCP.Ack,
+		}, true
+	case 6:
+		srcIP6 := meta.SrcIP.To16()
+		dstIP6 := meta.DstIP.To16()
+		if srcIP6 == nil || dstIP6 == nil {
+			return rawsock.ConnInfo{}, false
+		}
+		return rawsock.ConnInfo{
+			SrcIP:   append([]byte{}, srcIP6...),
+			DstIP:   append([]byte{}, dstIP6...),
+			SrcPort: meta.SrcPort,
+			DstPort: meta.DstPort,
+			Seq:     meta.TCP.Seq,
+			Ack:     meta.TCP.Ack,
+		}, true
+	default:
 		return rawsock.ConnInfo{}, false
 	}
-	return rawsock.ConnInfo{
-		SrcIP:   append([]byte{}, srcIP4...),
-		DstIP:   append([]byte{}, dstIP4...),
-		SrcPort: meta.SrcPort,
-		DstPort: meta.DstPort,
-		Seq:     meta.TCP.Seq,
-		Ack:     meta.TCP.Ack,
-	}, true
 }
 
 func portAllowed(port uint16, ports []uint16) bool {

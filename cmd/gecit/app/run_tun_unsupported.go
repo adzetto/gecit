@@ -10,5 +10,5 @@ import (
 )
 
 func newPlatformEngine(cfg engine.Config, logger *logrus.Logger) (engine.Engine, error) {
-	return nil, fmt.Errorf("TUN engine requires build tag with_gvisor")
+	return nil, fmt.Errorf("TUN engine on darwin/windows requires build tag with_gvisor")
 }
