@@ -278,20 +278,21 @@ func platformTunName() string {
 }
 
 func detectPhysicalInterface() string {
+	if runtime.GOOS == "windows" {
+		if iface := detectWindowsPhysicalInterface(); iface != "" {
+			return iface
+		}
+	}
+	return detectGenericPhysicalInterface()
+}
+
+func detectGenericPhysicalInterface() string {
 	ifaces, _ := net.Interfaces()
 	for _, iface := range ifaces {
 		if iface.Flags&net.FlagUp == 0 || iface.Flags&net.FlagLoopback != 0 {
 			continue
 		}
-		name := iface.Name
-		// Skip virtual interfaces (TUN, bridge, veth, etc.)
-		for _, prefix := range []string{"utun", "bridge", "veth", "vmnet", "lo"} {
-			if len(name) >= len(prefix) && name[:len(prefix)] == prefix {
-				name = ""
-				break
-			}
-		}
-		if name == "" {
+		if isVirtualInterfaceName(iface.Name) {
 			continue
 		}
 		addrs, _ := iface.Addrs()
@@ -301,9 +302,45 @@ func detectPhysicalInterface() string {
 				continue
 			}
 			if ipv4 := ipNet.IP.To4(); ipv4 != nil && !ipv4.IsLoopback() && !ipv4.Equal(net.IPv4(10, 0, 85, 1)) {
-				return name
+				return iface.Name
 			}
 		}
 	}
 	return ""
+}
+
+func isVirtualInterfaceName(name string) bool {
+	lower := strings.ToLower(strings.TrimSpace(name))
+	for _, prefix := range []string{
+		"utun",
+		"bridge",
+		"veth",
+		"vmnet",
+		"lo",
+		"vethernet",
+		"loopback",
+		"wintun",
+		"docker",
+		"br-",
+		"virbr",
+		"zt",
+		"tailscale",
+	} {
+		if strings.HasPrefix(lower, prefix) {
+			return true
+		}
+	}
+	for _, fragment := range []string{
+		"default switch",
+		"hyper-v",
+		"wsl",
+		"virtual",
+		"npcap",
+		"wireguard",
+	} {
+		if strings.Contains(lower, fragment) {
+			return true
+		}
+	}
+	return false
 }

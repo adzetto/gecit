@@ -1,4 +1,4 @@
-//go:build windows && !cgo
+//go:build windows
 
 package rawsock
 
@@ -20,6 +20,20 @@ type platformRawSocket struct {
 }
 
 func New() (RawSocket, error) {
+	if sock, err, ok := tryPcapRawSocket(); ok {
+		if err == nil {
+			return sock, nil
+		}
+		native, nativeErr := newWindowsRawSocket()
+		if nativeErr == nil {
+			return native, nil
+		}
+		return nil, fmt.Errorf("pcap raw socket failed: %v; native raw socket failed: %w", err, nativeErr)
+	}
+	return newWindowsRawSocket()
+}
+
+func newWindowsRawSocket() (RawSocket, error) {
 	fd, err := windows.Socket(windows.AF_INET, windows.SOCK_RAW, ipProtoRaw)
 	if err != nil {
 		return nil, fmt.Errorf("raw socket: %w", err)
