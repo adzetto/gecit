@@ -1,12 +1,11 @@
 //go:build linux
 
-package nfq
+package router
 
 import (
 	"context"
 
 	"github.com/boratanrikulu/gecit/pkg/rawsock"
-	"github.com/boratanrikulu/gecit/pkg/router"
 	"github.com/florianl/go-nfqueue/v2"
 	"github.com/sirupsen/logrus"
 )
@@ -15,18 +14,16 @@ type socketMarker interface {
 	SetMark(mark uint32) error
 }
 
-// Runner consumes packets from an NFQUEUE and asks a router processor whether to inject.
-type Runner struct {
-	cfg       router.Config
-	processor *router.Processor
+type nfqRunner struct {
+	cfg       Config
+	processor *Processor
 	rawSock   rawsock.RawSocket
 	queue     *nfqueue.Nfqueue
 	logger    *logrus.Logger
 }
 
-// NewRunner creates the experimental Linux NFQUEUE data-plane worker.
-func NewRunner(cfg router.Config, logger *logrus.Logger) (*Runner, error) {
-	processor, err := router.NewProcessor(cfg)
+func newNFQRunner(cfg Config, logger *logrus.Logger) (*nfqRunner, error) {
+	processor, err := NewProcessor(cfg)
 	if err != nil {
 		return nil, err
 	}
@@ -34,15 +31,14 @@ func NewRunner(cfg router.Config, logger *logrus.Logger) (*Runner, error) {
 		logger = logrus.New()
 	}
 
-	return &Runner{
+	return &nfqRunner{
 		cfg:       cfg.Normalized(),
 		processor: processor,
 		logger:    logger,
 	}, nil
 }
 
-// Start opens NFQUEUE and processes packets until the context is canceled.
-func (r *Runner) Start(ctx context.Context) error {
+func (r *nfqRunner) Start(ctx context.Context) error {
 	if err := r.openRawSocket(); err != nil {
 		return err
 	}
@@ -55,7 +51,7 @@ func (r *Runner) Start(ctx context.Context) error {
 		Flags:        nfqueue.NfQaCfgFlagFailOpen,
 	})
 	if err != nil {
-		r.rawSock.Close()
+		_ = r.rawSock.Close()
 		r.rawSock = nil
 		return err
 	}
@@ -64,9 +60,7 @@ func (r *Runner) Start(ctx context.Context) error {
 	return r.queue.RegisterWithErrorFunc(ctx, r.handlePacket, r.handleError)
 }
 
-// Stop closes the queue and the raw socket. Both resources are always
-// closed even if one of them returns an error.
-func (r *Runner) Stop() error {
+func (r *nfqRunner) Stop() error {
 	var firstErr error
 	if r.queue != nil {
 		if err := r.queue.Close(); err != nil {
@@ -83,14 +77,14 @@ func (r *Runner) Stop() error {
 	return firstErr
 }
 
-func (r *Runner) openRawSocket() error {
+func (r *nfqRunner) openRawSocket() error {
 	rs, err := rawsock.New()
 	if err != nil {
 		return err
 	}
 	if marker, ok := rs.(socketMarker); ok {
 		if err := marker.SetMark(r.cfg.PacketMark); err != nil {
-			rs.Close()
+			_ = rs.Close()
 			return err
 		}
 	}
@@ -98,7 +92,7 @@ func (r *Runner) openRawSocket() error {
 	return nil
 }
 
-func (r *Runner) handlePacket(attr nfqueue.Attribute) int {
+func (r *nfqRunner) handlePacket(attr nfqueue.Attribute) int {
 	if attr.PacketID == nil {
 		return 0
 	}
@@ -132,14 +126,14 @@ func (r *Runner) handlePacket(attr nfqueue.Attribute) int {
 	return 0
 }
 
-func (r *Runner) handleError(err error) int {
+func (r *nfqRunner) handleError(err error) int {
 	if err != nil {
 		r.logger.WithError(err).Warn("nfqueue read error")
 	}
 	return 0
 }
 
-func (r *Runner) accept(id uint32) {
+func (r *nfqRunner) accept(id uint32) {
 	if err := r.queue.SetVerdict(id, nfqueue.NfAccept); err != nil {
 		r.logger.WithError(err).Warn("failed to accept queued packet")
 	}
