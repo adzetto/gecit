@@ -8,12 +8,11 @@ import (
 	"os/exec"
 	"strings"
 
-	"github.com/boratanrikulu/gecit/pkg/router/nfq"
 	"github.com/sirupsen/logrus"
 )
 
 func defaultRunnerFactory(cfg Config, logger *logrus.Logger) (lifecycleRunner, error) {
-	return nfq.NewRunner(cfg, logger)
+	return newNFQRunner(cfg, logger)
 }
 
 func defaultBatchApplier(ctx context.Context, batch string) error {
