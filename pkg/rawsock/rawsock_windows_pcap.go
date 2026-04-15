@@ -36,12 +36,20 @@ func New() (RawSocket, error) {
 
 func (s *pcapRawSocket) SendFake(conn ConnInfo, payload []byte, ttl int) error {
 	ipTcp := BuildPacket(conn, payload, ttl)
+	if len(ipTcp) == 0 {
+		return fmt.Errorf("invalid IP family or address pair")
+	}
 
 	frame := make([]byte, 14+len(ipTcp))
 	copy(frame[0:6], s.dstMAC)
 	copy(frame[6:12], s.srcMAC)
-	frame[12] = 0x08
-	frame[13] = 0x00
+	if connIPFamily(conn) == ipFamilyIPv6 {
+		frame[12] = 0x86
+		frame[13] = 0xdd
+	} else {
+		frame[12] = 0x08
+		frame[13] = 0x00
+	}
 	copy(frame[14:], ipTcp)
 
 	return s.handle.WritePacketData(frame)
