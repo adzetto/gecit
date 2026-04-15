@@ -18,20 +18,20 @@ type pcapRawSocket struct {
 	dstMAC net.HardwareAddr
 }
 
-func New() (RawSocket, error) {
+func tryPcapRawSocket() (RawSocket, error, bool) {
 	iface, err := defaultInterface()
 	if err != nil {
-		return nil, fmt.Errorf("detect interface: %w", err)
+		return nil, fmt.Errorf("detect interface: %w", err), true
 	}
 
 	handle, err := pcap.OpenLive(iface, 0, false, 100*time.Millisecond)
 	if err != nil {
-		return nil, fmt.Errorf("pcap open %s: %w (is Npcap installed?)", iface, err)
+		return nil, fmt.Errorf("pcap open %s: %w (is Npcap installed?)", iface, err), true
 	}
 
 	srcMAC, dstMAC := discoverMACs()
 
-	return &pcapRawSocket{handle: handle, srcMAC: srcMAC, dstMAC: dstMAC}, nil
+	return &pcapRawSocket{handle: handle, srcMAC: srcMAC, dstMAC: dstMAC}, nil, true
 }
 
 func (s *pcapRawSocket) SendFake(conn ConnInfo, payload []byte, ttl int) error {

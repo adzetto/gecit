@@ -1,4 +1,4 @@
-//go:build windows && !cgo
+//go:build windows
 
 package capture
 
@@ -30,6 +30,20 @@ type rawCapture struct {
 }
 
 func NewCapture(iface string, ports []uint16) (Detector, error) {
+	if det, err, ok := tryPcapCapture(iface, ports); ok {
+		if err == nil {
+			return det, nil
+		}
+		rawDet, rawErr := newRawCapture(iface, ports)
+		if rawErr == nil {
+			return rawDet, nil
+		}
+		return nil, fmt.Errorf("pcap capture failed: %v; raw capture failed: %w", err, rawErr)
+	}
+	return newRawCapture(iface, ports)
+}
+
+func newRawCapture(iface string, ports []uint16) (Detector, error) {
 	localIPv4, localIPv6, err := resolveInterfaceIPs(iface)
 	if err != nil {
 		return nil, err
